@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Выбор карт</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0;
+    padding: 24px 16px;
+    min-height: 100vh;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--tg-theme-bg-color, #ffffff);
+    color: var(--tg-theme-text-color, #000000);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h1 { font-size: 18px; margin: 0 0 6px; text-align: center; }
+  p.hint {
+    font-size: 14px;
+    color: var(--tg-theme-hint-color, #999999);
+    margin: 0 0 28px;
+    text-align: center;
+    line-height: 1.4;
+    max-width: 360px;
+  }
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 480px;
+  }
+  .card {
+    width: 18vw;
+    max-width: 84px;
+    min-width: 56px;
+    aspect-ratio: 2 / 3;
+    perspective: 800px;
+    cursor: pointer;
+  }
+  .card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    transition: transform 0.7s cubic-bezier(0.4, 0.2, 0.2, 1), box-shadow 0.4s ease;
+    transform-style: preserve-3d;
+  }
+  .card.glow .card-inner {
+    box-shadow: 0 0 18px 5px var(--tg-theme-button-color, #d9a441);
+  }
+  .card.flipped .card-inner {
+    transform: rotateY(180deg);
+  }
+  .card-face {
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    backface-visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  }
+  .card-face img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .card-face img.reversed {
+    transform: rotate(180deg);
+  }
+  .card-back { background: #2b2440; }
+  .card-front {
+    transform: rotateY(180deg);
+    background: linear-gradient(160deg, #3a2f55, #6b4f8a);
+    padding: 6px;
+    box-sizing: border-box;
+  }
+  .card-front .placeholder {
+    font-size: 12px;
+    line-height: 1.3;
+    text-align: center;
+    color: #f1e9ff;
+    word-break: break-word;
+  }
+  .card-front .placeholder.reversed { transform: rotate(180deg); }
+  .status {
+    margin-top: 28px;
+    font-size: 14px;
+    color: var(--tg-theme-hint-color, #999999);
+    text-align: center;
+    min-height: 20px;
+  }
+</style>
+</head>
+<body>
+  <h1>Выбери три карты 🐾</h1>
+  <p class="hint">Карты лежат рубашкой вверх. Коснись трёх — по наитию, не раздумывая. Остальные так и останутся закрытыми.</p>
+
+  <div class="grid" id="grid"></div>
+  <p class="status" id="status"></p>
+
+<script>
+  const tg = window.Telegram.WebApp;
+  tg.ready();
+  tg.expand();
+
+  const params = new URLSearchParams(location.search);
+  let cards = [];
+  try { cards = JSON.parse(params.get('cards') || '[]'); } catch (e) {}
+  const backUrl = params.get('back') || '';
+
+  const TOTAL_SLOTS = 5;
+  const PICK_COUNT = Math.min(3, cards.length);
+  const GLOW_MS = 2000;
+
+  const grid = document.getElementById('grid');
+  const status = document.getElementById('status');
+
+  let pickedCount = 0;
+  let busy = false;
+
+  for (let i = 0; i < TOTAL_SLOTS; i++) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML =
+      '<div class="card-inner">' +
+        '<div class="card-face card-back"><img src="' + backUrl + '" alt=""></div>' +
+        '<div class="card-face card-front"></div>' +
+      '</div>';
+    card.addEventListener('click', () => pick(card));
+    grid.appendChild(card);
+  }
+
+  function pick(card) {
+    if (busy || card.classList.contains('flipped') || pickedCount >= PICK_COUNT) return;
+    busy = true;
+
+    const data = cards[pickedCount];
+    pickedCount++;
+
+    card.classList.add('glow');
+    setTimeout(() => {
+      card.classList.remove('glow');
+      reveal(card, data);
+      card.classList.add('flipped');
+      busy = false;
+
+      if (pickedCount >= PICK_COUNT) {
+        status.textContent = 'Карты легли как нужно ✨';
+        setTimeout(() => tg.sendData(JSON.stringify({ done: true })), 1000);
+      } else {
+        status.textContent = 'Ещё ' + (PICK_COUNT - pickedCount) + (PICK_COUNT - pickedCount === 1 ? ' карта' : ' карты');
+      }
+    }, GLOW_MS);
+  }
+
+  function reveal(card, data) {
+    const front = card.querySelector('.card-front');
+    if (!data) return;
+    if (data.image) {
+      const img = document.createElement('img');
+      img.src = data.image;
+      img.alt = data.name || '';
+      if (data.reversed) img.classList.add('reversed');
+      front.appendChild(img);
+    } else {
+      const span = document.createElement('span');
+      span.className = 'placeholder' + (data.reversed ? ' reversed' : '');
+      span.textContent = data.name || '';
+      front.appendChild(span);
+    }
+  }
+
+  status.textContent = 'Осталось выбрать ' + PICK_COUNT + (PICK_COUNT === 1 ? ' карту' : ' карты');
+</script>
+</body>
+</html>
