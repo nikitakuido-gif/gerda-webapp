@@ -102,6 +102,15 @@
     if (!fields.city.value && draft.city) fields.city.value = draft.city;
   } catch (e) {}
 
+  // Если имени всё ещё нет — берём его из самого Telegram (имя аккаунта).
+  // Дату/время рождения и город Telegram боту не передаёт (их просто нет
+  // в данных аккаунта), так что автоматически их подставить нельзя —
+  // только из уже сохранённого профиля (см. query-параметры выше).
+  if (!fields.name.value) {
+    const tgUser = tg.initDataUnsafe && tg.initDataUnsafe.user;
+    if (tgUser && tgUser.first_name) fields.name.value = tgUser.first_name;
+  }
+
   function saveDraft() {
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
