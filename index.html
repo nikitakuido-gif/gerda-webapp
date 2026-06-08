@@ -82,10 +82,43 @@
     city: document.getElementById('city'),
   };
 
+  // Бот передаёт уже сохранённые данные профиля через query-параметры —
+  // иначе форма при повторном открытии («Изменить данные») выглядела бы пустой,
+  // хотя в профиле уже всё заполнено.
+  const params = new URLSearchParams(location.search);
+  if (params.get('name')) fields.name.value = params.get('name');
+  if (params.get('date')) fields.date.value = params.get('date');
+  if (params.get('time')) fields.time.value = params.get('time');
+  if (params.get('city')) fields.city.value = params.get('city');
+
+  // Черновик из localStorage — подстраховка для полей, которых ещё нет в профиле
+  // (например, человек начал заполнять анкету, не сохранил и открыл её снова).
+  const DRAFT_KEY = 'gerda_onboarding_draft';
+  try {
+    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}');
+    if (!fields.name.value && draft.name) fields.name.value = draft.name;
+    if (!fields.date.value && draft.date) fields.date.value = draft.date;
+    if (!fields.time.value && draft.time) fields.time.value = draft.time;
+    if (!fields.city.value && draft.city) fields.city.value = draft.city;
+  } catch (e) {}
+
+  function saveDraft() {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        name: fields.name.value,
+        date: fields.date.value,
+        time: fields.time.value,
+        city: fields.city.value,
+      }));
+    } catch (e) {}
+  }
+  Object.values(fields).forEach((el) => el.addEventListener('input', saveDraft));
+
   tg.MainButton.setText('Сохранить');
   tg.MainButton.show();
 
   tg.MainButton.onClick(() => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
     tg.sendData(JSON.stringify({
       name: fields.name.value.trim() || null,
       birth_date: fields.date.value || null,
@@ -96,3 +129,4 @@
 </script>
 </body>
 </html>
+
