@@ -102,13 +102,19 @@
     if (!fields.city.value && draft.city) fields.city.value = draft.city;
   } catch (e) {}
 
-  // Если имени всё ещё нет — берём его из самого Telegram (имя аккаунта).
-  // Дату/время рождения и город Telegram боту не передаёт (их просто нет
-  // в данных аккаунта), так что автоматически их подставить нельзя —
-  // только из уже сохранённого профиля (см. query-параметры выше).
+  // Если имени всё ещё нет — подставляем имя из Telegram-аккаунта.
+  // Бот передаёт его параметром tg_name (надёжный источник: message.from_user.first_name) —
+  // полагаться только на Telegram.WebApp.initDataUnsafe.user нельзя: на части
+  // клиентов (например, Telegram Desktop) эти данные странице не передаются.
+  // Дату/время рождения и город Telegram боту не сообщает вовсе — их можно
+  // получить только из уже сохранённого профиля (см. query-параметры выше).
   if (!fields.name.value) {
-    const tgUser = tg.initDataUnsafe && tg.initDataUnsafe.user;
-    if (tgUser && tgUser.first_name) fields.name.value = tgUser.first_name;
+    if (params.get('tg_name')) {
+      fields.name.value = params.get('tg_name');
+    } else {
+      const tgUser = tg.initDataUnsafe && tg.initDataUnsafe.user;
+      if (tgUser && tgUser.first_name) fields.name.value = tgUser.first_name;
+    }
   }
 
   function saveDraft() {
@@ -138,6 +144,7 @@
 </script>
 </body>
 </html>
+
 
 
 
