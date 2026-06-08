@@ -154,6 +154,24 @@
     transition: opacity 0.5s ease;
   }
   .hint-tap.visible { opacity: 1; }
+  .close-btn {
+    margin-top: 18px;
+    border: none;
+    border-radius: 999px;
+    padding: 13px 30px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1c1430;
+    background: #d9a441;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease;
+  }
+  .close-btn.visible {
+    opacity: 1;
+    visibility: visible;
+  }
 
   /* Просмотр карты крупным планом — чтобы налюбоваться визуалом не торопясь */
   .detail-overlay {
@@ -233,6 +251,7 @@
   <div class="grid" id="grid"></div>
   <p class="status" id="status"></p>
   <p class="hint-tap" id="hintTap">Коснись открытой карты ещё раз — чтобы рассмотреть её крупно</p>
+  <button class="close-btn" id="closeBtn">✦ Закрыть расклад</button>
 
   <div class="detail-overlay" id="detailOverlay">
     <div class="detail-card" id="detailCard"></div>
@@ -262,6 +281,7 @@
   const grid = document.getElementById('grid');
   const status = document.getElementById('status');
   const hintTap = document.getElementById('hintTap');
+  const closeBtn = document.getElementById('closeBtn');
 
   const overlay = document.getElementById('detailOverlay');
   const detailCard = document.getElementById('detailCard');
@@ -269,7 +289,7 @@
   const detailClose = document.getElementById('detailClose');
 
   let pickedCount = 0;
-  let completedCount = 0;
+  let revealedCount = 0;
   let lastPickAt = 0;
 
   for (let i = 0; i < TOTAL_SLOTS; i++) {
@@ -311,16 +331,17 @@
       card.classList.remove('glow');
       reveal(card, data);
       card.classList.add('flipped', 'glow');
+      revealedCount++;
 
-      setTimeout(() => {
-        card.classList.remove('glow');
-        completedCount++;
-        if (completedCount >= PICK_COUNT) {
-          status.textContent = 'Карты легли как нужно ✨';
-          hintTap.classList.add('visible');
-          setTimeout(() => tg.sendData(JSON.stringify({ done: true })), 600);
-        }
-      }, HOLD_MS);
+      // Кнопка закрытия появляется сразу, как только открыта третья карта —
+      // дальше пользователь сам решает, сколько любоваться раскладом перед уходом.
+      if (revealedCount >= PICK_COUNT) {
+        status.textContent = 'Карты легли как нужно ✨';
+        hintTap.classList.add('visible');
+        closeBtn.classList.add('visible');
+      }
+
+      setTimeout(() => card.classList.remove('glow'), HOLD_MS);
     }, GLOW_MS);
   }
 
@@ -365,6 +386,8 @@
     overlay.classList.remove('open');
     tg.BackButton.hide();
   }
+
+  closeBtn.addEventListener('click', () => tg.sendData(JSON.stringify({ done: true })));
 
   detailClose.addEventListener('click', closeDetail);
   overlay.addEventListener('click', (e) => {
