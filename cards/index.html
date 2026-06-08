@@ -70,28 +70,24 @@
   }
   .grid {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+    justify-content: center;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
     width: 100%;
-    max-width: 620px;
-    overflow-x: auto;
-    overflow-y: visible;
+    max-width: 360px;
     padding: 6px 4px 14px;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
   }
   .card {
-    /* Карты крупнее на ~40% против исходных (18vw/84/56) — ряд из пяти штук
-       не всегда влезает в экран целиком, поэтому .grid скроллится по горизонтали. */
+    /* Плитка 2-2-1: ширина ~42% контейнера — в ряд помещается ровно две карты,
+       пятая остаётся одна по центру последней строки. */
     flex: 0 0 auto;
-    width: 25.2vw;
-    max-width: 118px;
-    min-width: 78px;
+    width: 42%;
+    max-width: 150px;
+    min-width: 96px;
     aspect-ratio: 2 / 3;
     perspective: 800px;
     cursor: pointer;
-    scroll-snap-align: center;
   }
   .card-inner {
     position: relative;
@@ -380,4 +376,5 @@
 </script>
 </body>
 </html>
+
 
