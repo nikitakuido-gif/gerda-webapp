@@ -207,7 +207,6 @@
     justify-content: center;
     background: linear-gradient(160deg, #3a2f55, #6b4f8a);
     transform-origin: center center;
-    transition: transform 0.15s ease;
   }
   .detail-rotate {
     border: 1.5px solid rgba(255, 255, 255, 0.22);
@@ -381,26 +380,33 @@
 
   // ── Просмотр карты крупным планом ───────────────────────────────────────────
 
-  let _dtScale = 1, _dtRot = 0;
+  let _dtScale = 1, _dtRot = 0, _dtX = 0, _dtY = 0;
   let _pinchDist = null, _pinchScaleStart = null;
   let _pinching = false;
+  let _panStart = null, _wasPanning = false;
 
   function applyDetailTransform() {
-    detailCard.style.transform = 'scale(' + _dtScale + ') rotate(' + _dtRot + 'deg)';
+    detailCard.style.transform =
+      'translate(' + _dtX + 'px, ' + _dtY + 'px) scale(' + _dtScale + ') rotate(' + _dtRot + 'deg)';
   }
 
   function resetDetailTransform() {
-    _dtScale = 1; _dtRot = 0;
+    _dtScale = 1; _dtRot = 0; _dtX = 0; _dtY = 0;
     detailCard.style.transform = '';
   }
 
   overlay.addEventListener('touchstart', function(e) {
     if (e.touches.length === 2) {
       _pinching = true;
+      _panStart = null;
       var dx = e.touches[0].clientX - e.touches[1].clientX;
       var dy = e.touches[0].clientY - e.touches[1].clientY;
       _pinchDist = Math.hypot(dx, dy);
       _pinchScaleStart = _dtScale;
+      e.preventDefault();
+    } else if (e.touches.length === 1 && _dtScale > 1) {
+      _panStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, tx: _dtX, ty: _dtY };
+      _wasPanning = false;
       e.preventDefault();
     }
   }, { passive: false });
@@ -411,6 +417,15 @@
       var dy = e.touches[0].clientY - e.touches[1].clientY;
       var dist = Math.hypot(dx, dy);
       _dtScale = Math.max(1, Math.min(4, _pinchScaleStart * dist / _pinchDist));
+      if (_dtScale <= 1) { _dtX = 0; _dtY = 0; }
+      applyDetailTransform();
+      e.preventDefault();
+    } else if (e.touches.length === 1 && _panStart !== null) {
+      var dx = e.touches[0].clientX - _panStart.x;
+      var dy = e.touches[0].clientY - _panStart.y;
+      _dtX = _panStart.tx + dx;
+      _dtY = _panStart.ty + dy;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) _wasPanning = true;
       applyDetailTransform();
       e.preventDefault();
     }
@@ -420,6 +435,10 @@
     if (e.touches.length < 2) {
       _pinchDist = null;
       setTimeout(function() { _pinching = false; }, 80);
+    }
+    if (e.touches.length === 0) {
+      _panStart = null;
+      setTimeout(function() { _wasPanning = false; }, 80);
     }
   });
 
@@ -454,7 +473,7 @@
 
   detailClose.addEventListener('click', closeDetail);
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay && !_pinching) closeDetail();
+    if (e.target === overlay && !_pinching && !_wasPanning) closeDetail();
   });
   tg.BackButton.onClick(closeDetail);
 
