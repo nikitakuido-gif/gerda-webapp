@@ -388,11 +388,18 @@
   function applyDetailTransform() {
     detailCard.style.transform =
       'translate(' + _dtX + 'px, ' + _dtY + 'px) scale(' + _dtScale + ') rotate(' + _dtRot + 'deg)';
+    var zoomed = _dtScale > 1.05;
+    detailName.style.opacity = zoomed ? '0' : '1';
+    document.getElementById('rotateBtn').style.opacity = zoomed ? '0' : '1';
+    document.getElementById('detailClose').style.opacity = zoomed ? '0' : '1';
   }
 
   function resetDetailTransform() {
     _dtScale = 1; _dtRot = 0; _dtX = 0; _dtY = 0;
     detailCard.style.transform = '';
+    detailName.style.opacity = '1';
+    document.getElementById('rotateBtn').style.opacity = '1';
+    document.getElementById('detailClose').style.opacity = '1';
   }
 
   overlay.addEventListener('touchstart', function(e) {
