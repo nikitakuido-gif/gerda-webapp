@@ -47,6 +47,29 @@
     color: var(--tg-theme-hint-color, #999999);
     line-height: 1.4;
   }
+  .hint-inline {
+    font-weight: 400;
+    color: var(--tg-theme-hint-color, #999999);
+  }
+  .gender-toggle {
+    display: flex;
+    gap: 8px;
+  }
+  .gender-btn {
+    flex: 1;
+    padding: 12px 14px;
+    font-size: 15px;
+    border: 1px solid var(--tg-theme-hint-color, #cccccc);
+    border-radius: 10px;
+    background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+    color: var(--tg-theme-text-color, #000000);
+    cursor: pointer;
+  }
+  .gender-btn.selected {
+    border-color: var(--tg-theme-button-color, #2481cc);
+    background: var(--tg-theme-button-color, #2481cc);
+    color: var(--tg-theme-button-text-color, #ffffff);
+  }
 </style>
 </head>
 <body>
@@ -67,6 +90,12 @@
 
   <label for="city">Город рождения</label>
   <input id="city" type="text" placeholder="Алматы" autocomplete="off">
+
+  <label>Пол <span class="hint-inline">(необязательно)</span></label>
+  <div class="gender-toggle">
+    <button type="button" class="gender-btn" data-value="male">🙋‍♂️ Мужской</button>
+    <button type="button" class="gender-btn" data-value="female">🙋‍♀️ Женский</button>
+  </div>
 
   <p class="skip-note">Нажми кнопку внизу, чтобы сохранить — пустые поля всегда можно дополнить позже в Профиле.</p>
 
@@ -91,6 +120,12 @@
   if (params.get('time')) fields.time.value = params.get('time');
   if (params.get('city')) fields.city.value = params.get('city');
 
+  // Пол — toggle-кнопки, не обычный input, поэтому храним выбор отдельно.
+  const genderButtons = document.querySelectorAll('.gender-btn');
+  let selectedGender = null;
+  const genderParam = params.get('gender');
+  if (genderParam === 'male' || genderParam === 'female') selectedGender = genderParam;
+
   // Черновик из localStorage — подстраховка для полей, которых ещё нет в профиле
   // (например, человек начал заполнять анкету, не сохранил и открыл её снова).
   const DRAFT_KEY = 'gerda_onboarding_draft';
@@ -100,7 +135,18 @@
     if (!fields.date.value && draft.date) fields.date.value = draft.date;
     if (!fields.time.value && draft.time) fields.time.value = draft.time;
     if (!fields.city.value && draft.city) fields.city.value = draft.city;
+    if (!selectedGender && (draft.gender === 'male' || draft.gender === 'female')) selectedGender = draft.gender;
   } catch (e) {}
+
+  function renderGender() {
+    genderButtons.forEach((btn) => btn.classList.toggle('selected', btn.dataset.value === selectedGender));
+  }
+  renderGender();
+  genderButtons.forEach((btn) => btn.addEventListener('click', () => {
+    selectedGender = selectedGender === btn.dataset.value ? null : btn.dataset.value;
+    renderGender();
+    saveDraft();
+  }));
 
   // Если имени всё ещё нет — подставляем имя из Telegram-аккаунта.
   // Бот передаёт его параметром tg_name (надёжный источник: message.from_user.first_name) —
@@ -124,6 +170,7 @@
         date: fields.date.value,
         time: fields.time.value,
         city: fields.city.value,
+        gender: selectedGender,
       }));
     } catch (e) {}
   }
@@ -139,6 +186,7 @@
       birth_date: fields.date.value || null,
       birth_time: fields.time.value || null,
       birth_city: fields.city.value.trim() || null,
+      gender: selectedGender,
     }));
   });
 </script>
