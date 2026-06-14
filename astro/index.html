@@ -12,7 +12,7 @@
     padding: 0;
     height: 100%;
     overflow: hidden;
-    background: radial-gradient(ellipse at 50% 40%, #0D0D2B 0%, #050510 100%);
+    background: radial-gradient(ellipse at 50% 40%, #0C0C27 0%, #05050E 100%);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-tap-highlight-color: transparent;
   }
@@ -82,10 +82,19 @@
   const promptEl = document.getElementById('prompt');
   const btn = document.getElementById('revealBtn');
 
+  // Рендерим в реальном разрешении экрана (devicePixelRatio), а рисуем в
+  // CSS-пикселях через ctx.setTransform — иначе на retina-экранах звёзды
+  // и линии выглядят размытыми.
+  const DPR = window.devicePixelRatio || 1;
   let W, H;
   function resize() {
-    W = canvas.width = window.innerWidth;
-    H = canvas.height = window.innerHeight;
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
   resize();
   window.addEventListener('resize', resize);
@@ -325,7 +334,7 @@
 
   // ── Геометрия созвездия ──────────────────────────────────────────────────
   function constellationPoints() {
-    const size = Math.min(W, H) * 0.74;
+    const size = Math.min(W, H) * 0.96;
     const cx = W / 2, cy = H * 0.40;
     return constellation.points.map((pt) => ({
       x: cx + (pt[0] - 0.5) * size,
@@ -344,15 +353,15 @@
     ctx.save();
     const rayLen = r * 2.6;
     ctx.strokeStyle = '#FFF6DD';
-    ctx.lineWidth = Math.max(0.5, r * 0.16);
+    ctx.lineWidth = Math.max(0.5, r * 0.14);
     ctx.shadowColor = '#E8D5A3';
-    ctx.shadowBlur = 3;
+    ctx.shadowBlur = 2;
     ctx.beginPath();
     ctx.moveTo(x - rayLen, y); ctx.lineTo(x + rayLen, y);
     ctx.moveTo(x, y - rayLen); ctx.lineTo(x, y + rayLen);
     ctx.stroke();
 
-    ctx.shadowBlur = 6;
+    ctx.shadowBlur = 4;
     ctx.fillStyle = '#E8D5A3';
     ctx.beginPath();
     ctx.arc(x, y, r * 0.6, 0, Math.PI * 2);
@@ -379,10 +388,10 @@
       const ex = pa.x + (pb.x - pa.x) * progress;
       const ey = pa.y + (pb.y - pa.y) * progress;
       ctx.save();
-      ctx.strokeStyle = 'rgba(232, 213, 163, 0.6)';
-      ctx.lineWidth = 1;
-      ctx.shadowColor = 'rgba(232, 213, 163, 0.8)';
-      ctx.shadowBlur = 4;
+      ctx.strokeStyle = 'rgba(232, 213, 163, 0.7)';
+      ctx.lineWidth = 0.75;
+      ctx.shadowColor = 'rgba(232, 213, 163, 0.6)';
+      ctx.shadowBlur = 2;
       ctx.beginPath();
       ctx.moveTo(pa.x, pa.y);
       ctx.lineTo(ex, ey);
@@ -424,8 +433,8 @@
     ctx.clearRect(0, 0, W, H);
 
     const grad = ctx.createRadialGradient(W / 2, H * 0.4, 0, W / 2, H * 0.4, Math.max(W, H) * 0.9);
-    grad.addColorStop(0, '#0D0D2B');
-    grad.addColorStop(1, '#050510');
+    grad.addColorStop(0, '#0C0C27');
+    grad.addColorStop(1, '#05050E');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
