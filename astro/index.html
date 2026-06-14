@@ -87,8 +87,11 @@
   // Рендерим в реальном разрешении экрана (devicePixelRatio), а рисуем в
   // CSS-пикселях через ctx.setTransform — иначе на retina-экранах звёзды
   // и линии выглядят размытыми.
-  const DPR = window.devicePixelRatio || 1;
-  let W, H;
+  // DPR > 2 не даёт заметной разницы в качестве на телефонах, но кратно
+  // увеличивает число пикселей, которые приходится блюрить (облака) —
+  // на слабых Android (например, Samsung A32) это основная причина лагов.
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  let W, H, bgGradient;
   function resize() {
     W = window.innerWidth;
     H = window.innerHeight;
@@ -97,8 +100,11 @@
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    bgGradient = ctx.createRadialGradient(W / 2, H * 0.4, 0, W / 2, H * 0.4, Math.max(W, H) * 0.9);
+    bgGradient.addColorStop(0, '#0C0C27');
+    bgGradient.addColorStop(1, '#05050E');
+    buildCloudSprites();
   }
-  resize();
   window.addEventListener('resize', resize);
 
   // ── Фоновые звёзды ────────────────────────────────────────────────────────
@@ -228,6 +234,46 @@
       alive: true,
     });
   }
+
+  // Каждое облако рисуется один раз в отдельный canvas с применённым
+  // ctx.filter = 'blur(...)', а дальше просто копируется через drawImage —
+  // блюр на весь экран каждый кадр на слабых Android-устройствах был
+  // главной причиной лагов в фазе «облака».
+  function buildCloudSprites() {
+    const minSide = Math.min(W, H);
+    clouds.forEach((cloud) => {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      cloud.blobs.forEach((b) => {
+        const bx = b.dx * W, by = b.dy * H, br = b.r * minSide;
+        minX = Math.min(minX, bx - br);
+        maxX = Math.max(maxX, bx + br);
+        minY = Math.min(minY, by - br);
+        maxY = Math.max(maxY, by + br);
+      });
+      const pad = 24;
+      const w = (maxX - minX) + pad * 2;
+      const h = (maxY - minY) + pad * 2;
+      const sprite = document.createElement('canvas');
+      sprite.width = Math.ceil(w * DPR);
+      sprite.height = Math.ceil(h * DPR);
+      const sctx = sprite.getContext('2d');
+      sctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      sctx.filter = 'blur(10px)';
+      sctx.fillStyle = 'rgba(200,200,215,0.5)';
+      cloud.blobs.forEach((b) => {
+        const bx = b.dx * W - minX + pad, by = b.dy * H - minY + pad, br = b.r * minSide;
+        sctx.beginPath();
+        sctx.arc(bx, by, br, 0, Math.PI * 2);
+        sctx.fill();
+      });
+      cloud.sprite = sprite;
+      cloud.spriteOffsetX = minX - pad;
+      cloud.spriteOffsetY = minY - pad;
+      cloud.spriteW = w;
+      cloud.spriteH = h;
+    });
+  }
+  resize();
 
   // ── Частицы разлёта облаков ───────────────────────────────────────────────
   let particles = [];
@@ -473,10 +519,7 @@
   function draw(now) {
     ctx.clearRect(0, 0, W, H);
 
-    const grad = ctx.createRadialGradient(W / 2, H * 0.4, 0, W / 2, H * 0.4, Math.max(W, H) * 0.9);
-    grad.addColorStop(0, '#0C0C27');
-    grad.addColorStop(1, '#05050E');
-    ctx.fillStyle = grad;
+    ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, W, H);
 
     if (flashStrength > 0) flashStrength = Math.max(0, flashStrength - 0.02);
@@ -497,15 +540,7 @@
         if (!c.alive) return;
         c.x += c.drift;
         if (c.x > 1.15) c.x = -0.15;
-        c.blobs.forEach((b) => {
-          ctx.save();
-          ctx.filter = 'blur(10px)';
-          ctx.beginPath();
-          ctx.fillStyle = 'rgba(200,200,215,0.5)';
-          ctx.arc((c.x + b.dx) * W, (c.y + b.dy) * H, b.r * Math.min(W, H), 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        });
+        ctx.drawImage(c.sprite, c.x * W + c.spriteOffsetX, c.y * H + c.spriteOffsetY, c.spriteW, c.spriteH);
       });
     }
 
