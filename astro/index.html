@@ -196,6 +196,63 @@
     }
   }
 
+  // ── Падающие звёзды ───────────────────────────────────────────────────────
+  let shootingStars = [];
+  let nextShootingStarAt = performance.now() + 1200 + Math.random() * 2000;
+
+  function spawnShootingStar() {
+    const fromLeft = Math.random() < 0.5;
+    const angle = (Math.PI / 7) + Math.random() * (Math.PI / 10);
+    const speed = (0.5 + Math.random() * 0.35) * Math.max(W, H);
+    shootingStars.push({
+      x: fromLeft ? -0.05 * W : W * 1.05,
+      y: Math.random() * H * 0.45,
+      vx: (fromLeft ? 1 : -1) * Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      len: (60 + Math.random() * 70) * (W / 400),
+      born: performance.now(),
+      life: 700 + Math.random() * 400,
+    });
+  }
+
+  function drawShootingStars(now) {
+    if (now >= nextShootingStarAt) {
+      spawnShootingStar();
+      nextShootingStarAt = now + 2200 + Math.random() * 4000;
+    }
+    shootingStars = shootingStars.filter((s) => now - s.born < s.life);
+    shootingStars.forEach((s) => {
+      const dt = (now - s.born) / 1000;
+      const t = (now - s.born) / s.life;
+      const x = s.x + s.vx * dt;
+      const y = s.y + s.vy * dt;
+      const dirLen = Math.hypot(s.vx, s.vy) || 1;
+      const tailX = x - (s.vx / dirLen) * s.len;
+      const tailY = y - (s.vy / dirLen) * s.len;
+      const fade = Math.sin(Math.min(1, t) * Math.PI);
+
+      ctx.save();
+      const grad = ctx.createLinearGradient(x, y, tailX, tailY);
+      grad.addColorStop(0, `rgba(255,255,255,${fade})`);
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#fff';
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(tailX, tailY);
+      ctx.stroke();
+
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = `rgba(255,255,255,${fade})`;
+      ctx.beginPath();
+      ctx.arc(x, y, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
   // ── Состояние анимации ───────────────────────────────────────────────────
   let phase = 'clouds'; // 'clouds' -> 'reveal' -> 'done'
   let aliveCount = CLOUD_COUNT;
@@ -268,7 +325,7 @@
 
   // ── Геометрия созвездия ──────────────────────────────────────────────────
   function constellationPoints() {
-    const size = Math.min(W, H) * 0.62;
+    const size = Math.min(W, H) * 0.74;
     const cx = W / 2, cy = H * 0.40;
     return constellation.points.map((pt) => ({
       x: cx + (pt[0] - 0.5) * size,
@@ -279,6 +336,34 @@
   function easeOutBack(t) {
     const c1 = 1.70158, c3 = c1 + 1;
     return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  }
+
+  // Чёткая звезда: тонкие лучи-блики + яркое ядро с белым центром —
+  // вместо мягкого размытого кружка.
+  function drawSharpStar(x, y, r) {
+    ctx.save();
+    const rayLen = r * 2.6;
+    ctx.strokeStyle = '#FFF6DD';
+    ctx.lineWidth = Math.max(0.5, r * 0.16);
+    ctx.shadowColor = '#E8D5A3';
+    ctx.shadowBlur = 3;
+    ctx.beginPath();
+    ctx.moveTo(x - rayLen, y); ctx.lineTo(x + rayLen, y);
+    ctx.moveTo(x, y - rayLen); ctx.lineTo(x, y + rayLen);
+    ctx.stroke();
+
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = '#E8D5A3';
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#FFFDF5';
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   function drawConstellation(now) {
@@ -313,14 +398,7 @@
       const scale = easeOutBack(t);
       const pulse = t >= 1 ? 1 + 0.18 * Math.sin(now / 450 + i) : 1;
       const r = Math.max(0, (3 + (i % 3)) * scale * pulse);
-      ctx.save();
-      ctx.fillStyle = '#E8D5A3';
-      ctx.shadowColor = '#E8D5A3';
-      ctx.shadowBlur = 8;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+      drawSharpStar(p.x, p.y, r);
     });
 
     // Символ знака — в геометрическом центре созвездия
@@ -361,6 +439,8 @@
       ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
       ctx.fill();
     });
+
+    drawShootingStars(now);
 
     if (phase === 'clouds') {
       clouds.forEach((c) => {
