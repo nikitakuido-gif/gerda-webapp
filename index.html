@@ -70,6 +70,22 @@
     background: var(--tg-theme-button-color, #2481cc);
     color: var(--tg-theme-button-text-color, #ffffff);
   }
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .checkbox-row input {
+    width: auto;
+    margin: 0;
+  }
+  .checkbox-row label {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--tg-theme-hint-color, #999999);
+  }
 </style>
 </head>
 <body>
@@ -90,6 +106,10 @@
 
   <label for="date">Дата рождения</label>
   <input id="date" type="date">
+  <div class="checkbox-row">
+    <input id="year-unknown" type="checkbox">
+    <label for="year-unknown">Не указывать год рождения — знак зодиака определится по дню и месяцу</label>
+  </div>
 
   <label for="time">Время рождения</label>
   <input id="time" type="time">
@@ -110,6 +130,7 @@
     time: document.getElementById('time'),
     city: document.getElementById('city'),
   };
+  const yearUnknown = document.getElementById('year-unknown');
 
   // Бот передаёт уже сохранённые данные профиля через query-параметры —
   // иначе форма при повторном открытии («Изменить данные») выглядела бы пустой,
@@ -119,6 +140,7 @@
   if (params.get('date')) fields.date.value = params.get('date');
   if (params.get('time')) fields.time.value = params.get('time');
   if (params.get('city')) fields.city.value = params.get('city');
+  if (params.get('year_known') === '0') yearUnknown.checked = true;
 
   // Пол — toggle-кнопки, не обычный input, поэтому храним выбор отдельно.
   const genderButtons = document.querySelectorAll('.gender-btn');
@@ -136,6 +158,7 @@
     if (!fields.time.value && draft.time) fields.time.value = draft.time;
     if (!fields.city.value && draft.city) fields.city.value = draft.city;
     if (!selectedGender && (draft.gender === 'male' || draft.gender === 'female')) selectedGender = draft.gender;
+    if (!yearUnknown.checked && draft.yearUnknown) yearUnknown.checked = true;
   } catch (e) {}
 
   function renderGender() {
@@ -171,19 +194,31 @@
         time: fields.time.value,
         city: fields.city.value,
         gender: selectedGender,
+        yearUnknown: yearUnknown.checked,
       }));
     } catch (e) {}
   }
   Object.values(fields).forEach((el) => el.addEventListener('input', saveDraft));
+  yearUnknown.addEventListener('change', saveDraft);
 
   tg.MainButton.setText('Сохранить');
   tg.MainButton.show();
 
   tg.MainButton.onClick(() => {
     try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+    // «Не указывать год» — оставляем в дате условный год 2000 (его не показываем
+    // пользователю и не используем), боту передаём отдельным флагом, что год
+    // не настоящий. Знак зодиака и гороскоп определяются по дню и месяцу.
+    let birthDate = fields.date.value || null;
+    let birthYearKnown = true;
+    if (birthDate && yearUnknown.checked) {
+      birthDate = '2000' + birthDate.slice(4);
+      birthYearKnown = false;
+    }
     tg.sendData(JSON.stringify({
       name: fields.name.value.trim() || null,
-      birth_date: fields.date.value || null,
+      birth_date: birthDate,
+      birth_year_known: birthYearKnown,
       birth_time: fields.time.value || null,
       birth_city: fields.city.value.trim() || null,
       gender: selectedGender,
