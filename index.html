@@ -27,7 +27,7 @@
     font-weight: 600;
     margin: 16px 0 6px;
   }
-  input {
+  input, select {
     width: 100%;
     box-sizing: border-box;
     padding: 12px 14px;
@@ -37,9 +37,17 @@
     background: var(--tg-theme-secondary-bg-color, #f5f5f5);
     color: var(--tg-theme-text-color, #000000);
   }
-  input:focus {
+  input:focus, select:focus {
     outline: none;
     border-color: var(--tg-theme-button-color, #2481cc);
+  }
+  .date-row {
+    display: flex;
+    gap: 8px;
+  }
+  .date-row select {
+    flex: 1;
+    min-width: 0;
   }
   .skip-note {
     margin-top: 28px;
@@ -70,22 +78,6 @@
     background: var(--tg-theme-button-color, #2481cc);
     color: var(--tg-theme-button-text-color, #ffffff);
   }
-  .checkbox-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 8px;
-  }
-  .checkbox-row input {
-    width: auto;
-    margin: 0;
-  }
-  .checkbox-row label {
-    margin: 0;
-    font-size: 13px;
-    font-weight: 400;
-    color: var(--tg-theme-hint-color, #999999);
-  }
 </style>
 </head>
 <body>
@@ -104,14 +96,14 @@
     <button type="button" class="gender-btn" data-value="female">🙋‍♀️ Женский</button>
   </div>
 
-  <label for="date">Дата рождения</label>
-  <input id="date" type="date">
-  <div class="checkbox-row">
-    <input id="year-unknown" type="checkbox">
-    <label for="year-unknown">Не учитывать год из поля выше — знак зодиака определится по дню и месяцу</label>
+  <label>Дата рождения</label>
+  <div class="date-row">
+    <select id="day"></select>
+    <select id="month"></select>
+    <select id="year"></select>
   </div>
   <p class="hint-inline" style="margin: 4px 0 0; font-size: 12px;">
-    Если не помнишь год — выбери в поле выше любой день и месяц (год можно любой) и поставь галочку.
+    Не помнишь год — выбери «Не помню» в последнем списке. Знак зодиака и гороскоп всё равно будут доступны.
   </p>
 
   <label for="time">Время рождения</label>
@@ -129,21 +121,53 @@
 
   const fields = {
     name: document.getElementById('name'),
-    date: document.getElementById('date'),
+    day: document.getElementById('day'),
+    month: document.getElementById('month'),
+    year: document.getElementById('year'),
     time: document.getElementById('time'),
     city: document.getElementById('city'),
   };
-  const yearUnknown = document.getElementById('year-unknown');
+
+  // Заполняем списки дня/месяца/года — нативные <select> работают надёжно
+  // во всех клиентах Telegram, в отличие от <input type="date">.
+  function populateSelect(select, options, placeholderText) {
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = placeholderText;
+    select.appendChild(placeholder);
+    options.forEach(([value, label]) => {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = label;
+      select.appendChild(opt);
+    });
+  }
+
+  const days = [];
+  for (let d = 1; d <= 31; d++) days.push([String(d).padStart(2, '0'), String(d)]);
+  populateSelect(fields.day, days, 'День');
+
+  const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+  populateSelect(fields.month, monthNames.map((name, i) => [String(i + 1).padStart(2, '0'), name]), 'Месяц');
+
+  const yearOptions = [['unknown', 'Не помню']];
+  const currentYear = new Date().getFullYear();
+  for (let y = currentYear; y >= 1920; y--) yearOptions.push([String(y), String(y)]);
+  populateSelect(fields.year, yearOptions, 'Год');
 
   // Бот передаёт уже сохранённые данные профиля через query-параметры —
   // иначе форма при повторном открытии («Изменить данные») выглядела бы пустой,
   // хотя в профиле уже всё заполнено.
   const params = new URLSearchParams(location.search);
   if (params.get('name')) fields.name.value = params.get('name');
-  if (params.get('date')) fields.date.value = params.get('date');
+  if (params.get('date')) {
+    const [y, m, d] = params.get('date').split('-');
+    fields.day.value = d;
+    fields.month.value = m;
+    fields.year.value = (params.get('year_known') === '0') ? 'unknown' : y;
+  }
   if (params.get('time')) fields.time.value = params.get('time');
   if (params.get('city')) fields.city.value = params.get('city');
-  if (params.get('year_known') === '0') yearUnknown.checked = true;
 
   // Пол — toggle-кнопки, не обычный input, поэтому храним выбор отдельно.
   const genderButtons = document.querySelectorAll('.gender-btn');
@@ -157,11 +181,12 @@
   try {
     const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}');
     if (!fields.name.value && draft.name) fields.name.value = draft.name;
-    if (!fields.date.value && draft.date) fields.date.value = draft.date;
+    if (!fields.day.value && draft.day) fields.day.value = draft.day;
+    if (!fields.month.value && draft.month) fields.month.value = draft.month;
+    if (!fields.year.value && draft.year) fields.year.value = draft.year;
     if (!fields.time.value && draft.time) fields.time.value = draft.time;
     if (!fields.city.value && draft.city) fields.city.value = draft.city;
     if (!selectedGender && (draft.gender === 'male' || draft.gender === 'female')) selectedGender = draft.gender;
-    if (!yearUnknown.checked && draft.yearUnknown) yearUnknown.checked = true;
   } catch (e) {}
 
   function renderGender() {
@@ -193,31 +218,49 @@
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
         name: fields.name.value,
-        date: fields.date.value,
+        day: fields.day.value,
+        month: fields.month.value,
+        year: fields.year.value,
         time: fields.time.value,
         city: fields.city.value,
         gender: selectedGender,
-        yearUnknown: yearUnknown.checked,
       }));
     } catch (e) {}
   }
-  Object.values(fields).forEach((el) => el.addEventListener('input', saveDraft));
-  yearUnknown.addEventListener('change', saveDraft);
+  Object.values(fields).forEach((el) => {
+    el.addEventListener('input', saveDraft);
+    el.addEventListener('change', saveDraft);
+  });
 
   tg.MainButton.setText('Сохранить');
   tg.MainButton.show();
 
+  // Если выбранного дня нет в указанном месяце (например, 31 февраля) —
+  // сдвигаем на последний существующий день месяца. Год «Не помню» считаем
+  // как 2000 — он високосный, поэтому 29 февраля всегда допустимо.
+  function clampDay(year, month, day) {
+    const y = (year === 'unknown' || !year) ? 2000 : parseInt(year, 10);
+    const maxDay = new Date(y, parseInt(month, 10), 0).getDate();
+    return String(Math.min(parseInt(day, 10), maxDay)).padStart(2, '0');
+  }
+
   tg.MainButton.onClick(() => {
     try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
-    // «Не указывать год» — оставляем в дате условный год 2000 (его не показываем
-    // пользователю и не используем), боту передаём отдельным флагом, что год
-    // не настоящий. Знак зодиака и гороскоп определяются по дню и месяцу.
-    let birthDate = fields.date.value || null;
+
+    let birthDate = null;
     let birthYearKnown = true;
-    if (birthDate && yearUnknown.checked) {
-      birthDate = '2000' + birthDate.slice(4);
-      birthYearKnown = false;
+    if (fields.day.value && fields.month.value) {
+      const yearValue = fields.year.value;
+      const day = clampDay(yearValue, fields.month.value, fields.day.value);
+      if (yearValue && yearValue !== 'unknown') {
+        birthDate = `${yearValue}-${fields.month.value}-${day}`;
+        birthYearKnown = true;
+      } else {
+        birthDate = `2000-${fields.month.value}-${day}`;
+        birthYearKnown = false;
+      }
     }
+
     tg.sendData(JSON.stringify({
       name: fields.name.value.trim() || null,
       birth_date: birthDate,
